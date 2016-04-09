@@ -4,7 +4,7 @@ use warnings;
 use autodie;
 use Data::Dumper;
 use List::Util qw(shuffle);
-use List::MoreUtils qw(first_index);
+use List::MoreUtils qw(firstidx);
 use Carp;
 
 sub del_ballots{
@@ -101,13 +101,35 @@ sub win_order{
 	my $k = 0;
 	foreach my $i(@maj){
 		my ($a_key,$a_subkey) = getsubkeys($i);
+		my $windx = firstidx {$_ == $a_key} @win;
+		my $lodx = firstidx {$_ == $a_subkey} @win;
+
+		if($windx == -1){#winner not in the ordering
+			if($lodx != -1){#if the loser of the duel is already in the
+			#ordering
+				splice @win,$lodx,0,$a_key;
+				#insert the winner above the loser
+			}
+			else{#none in the current ordering
+				push @win,$a_key;
+				push @win,$a_subkey;
+			}
+		}
+		else{#winner already in the ordering
+			if($lodx == -1){#loser not in the ordering
+				push @win,$a_subkey;
+			}
+		}
 
 =head
 ici, utiliser shift et unshift pour rajouter au dessus ou en dessous dans la
 liste, et first_index pour vérifier si un candidat est déjà dans la liste des
 gagnants
 =cut
-		print Dumper(\@win);
+	}
+	print "Here is the win order:\n";
+	foreach my $c (@win){
+		print "$c\n";
 	}
 }
 
@@ -148,11 +170,9 @@ sub main{
 		$j++;
 	}
 
-	print "candidates:\n".Dumper(\@candidates);
 	my $hash = enumerate(\@candidates);
 	my @files = shuffle(glob("*.vt"));
 	foreach my $f (@files){
-		print "opening $f\n";
 		open(my $fh,'<',$f);
 		readfile($hash,$fh);
 		close($fh);
