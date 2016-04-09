@@ -101,6 +101,12 @@ sub win_order{
 	my $k = 0;
 	foreach my $i(@maj){
 		my ($a_key,$a_subkey) = getsubkeys($i);
+
+=head
+ici, utiliser shift et unshift pour rajouter au dessus ou en dessous dans la
+liste, et first_index pour vérifier si un candidat est déjà dans la liste des
+gagnants
+=cut
 		print Dumper(\@win);
 	}
 }
