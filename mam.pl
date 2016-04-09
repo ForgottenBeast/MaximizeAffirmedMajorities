@@ -4,6 +4,7 @@ use warnings;
 use autodie;
 use Data::Dumper;
 use List::Util qw(shuffle);
+use List::MoreUtils qw(first_index);
 use Carp;
 
 sub del_ballots{
@@ -93,16 +94,6 @@ sub calculate_majorities{
 	return \@majorities;
 }
 
-sub is_in{
-	my ($val,$arr_ref) = @_;
-	foreach my $i (@{$arr_ref}){
-		if($i == $val){
-			return 1;
-		}
-	}
-	return 0;
-}
-
 sub win_order{
 	my $majorities = shift;
 	my @maj = @{$majorities};
@@ -110,15 +101,8 @@ sub win_order{
 	my $k = 0;
 	foreach my $i(@maj){
 		my ($a_key,$a_subkey) = getsubkeys($i);
-		if(is_in($a_key,\@win)){
-			next;#winner already in the order, jump to next
-		}
-		else{
-			$win[$k] = $a_key;
-			$k++;
-		}
+		print Dumper(\@win);
 	}
-	print Dumper(\@win);
 }
 
 sub getsubkeys{
