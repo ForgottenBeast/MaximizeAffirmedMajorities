@@ -4,6 +4,7 @@ use warnings;
 use autodie;
 use Data::Dumper;
 use List::Util qw(shuffle);
+use Carp;
 
 sub del_ballots{
 	for my $f(glob("*.vt")){
@@ -62,8 +63,9 @@ sub readfile{
 sub calculate_majorities{
 	my $votes = shift;
 	my @candidates = keys %$votes;
-	my %majorities;
+	my @majorities;
 	my %done;
+	my $n = 0;
 	for my $i (0 .. $#candidates){
 		for my $j (0 .. $#candidates){
 			my $c1 = $candidates[$i];
@@ -73,26 +75,78 @@ sub calculate_majorities{
 				my $fori = $votes->{$c1}->{$c2};
 				my $forj = $votes->{$c2}->{$c1};
 				if($fori == 0){
-					$majorities{$c2}{$c1} = 100;
+					$majorities[$n] = {$c2 =>{$c1 => 100}};
 				}
 				elsif($forj == 0){
-					$majorities{$c1}{$c2} = 100;
+					$majorities[$n] = {$c1=>{$c2 => 100}};
 				}
-				if($fori > $forj){
-					$majorities{$c1}{$c2} = ($forj/$fori)*100;
+				elsif($fori > $forj){
+					$majorities[$n] = {$c1=>{$c2 => ($forj/$fori)*100}};
 				}
 				else{
-					$majorities{$c2}{$c1} = ($fori/$forj)*100;
+					$majorities[$n] = {$c2=>{$c1 => ($fori/$forj)*100}};
 				}
+				$n++;
 			}
 		}
 	}
-	return \%majorities;
+	return \@majorities;
 }
 
-sub sort_maj{
-	my $majs = shift;
+sub is_in{
+	my ($val,$arr_ref) = @_;
+	foreach my $i (@{$arr_ref}){
+		if($i == $val){
+			return 1;
+		}
+	}
+	return 0;
+}
 
+sub win_order{
+	my $majorities = shift;
+	my @maj = @{$majorities};
+	my @win;
+	my $k = 0;
+	foreach my $i(@maj){
+		my ($a_key,$a_subkey) = getsubkeys($i);
+		if(is_in($a_key,\@win)){
+			next;#winner already in the order, jump to next
+		}
+		else{
+			$win[$k] = $a_key;
+			$k++;
+		}
+	}
+	print Dumper(\@win);
+}
+
+sub getsubkeys{
+	my($a,$b) = @_;#get one keyed/subkeyed hashs
+	my ($a_key,$a_subkey,$b_key,$b_subkey);
+	if(defined($a) && defined($b)){
+		$a_key = (keys $a)[0];
+		$a_subkey =(keys $a->{$a_key})[0];
+
+		$b_key = (keys $b)[0];
+		$b_subkey = (keys $b->{$b_key})[0];
+
+		return ($a_key,$a_subkey,$b_key,$b_subkey);
+	}
+	elsif(defined($a) && !defined($b)){
+		$a_key = (keys $a)[0];
+		$a_subkey =(keys $a->{$a_key})[0];
+		return ($a_key,$a_subkey);
+	}
+	else{
+		croak "get subkeys takes at least one arg\n";
+	}
+}
+
+sub majsort{
+	my ($a_key,$a_subkey,$b_key,$b_subkey) = getsubkeys($a,$b);
+
+	$b->{$b_key}->{$b_subkey} <=> $a->{$a_key}->{$a_subkey};
 }
 
 sub main{
@@ -114,14 +168,18 @@ sub main{
 		close($fh);
 	}
 
-	my %maj = %{calculate_majorities($hash)};
-	print Dumper(\%maj);
+	my @maj = @{calculate_majorities($hash)};
+	@maj = sort majsort @maj;
+	print Dumper(\@maj);
+
+	win_order(\@maj);
 }
 
 if(!defined($ARGV[0])||!defined($ARGV[1])){
 	print 'usage: ./mam.pl $number_of_candidates $number_of_ballots'."\n";
 	exit(0);
 }
+
 
 make_ballots($ARGV[1],$ARGV[0]);
 main($ARGV[0]);
