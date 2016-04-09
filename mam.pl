@@ -75,17 +75,12 @@ sub calculate_majorities{
 				$done{$c1}{$c2} = 1;
 				my $fori = $votes->{$c1}->{$c2};
 				my $forj = $votes->{$c2}->{$c1};
-				if($fori == 0){
-					$majorities[$n] = {$c2 =>{$c1 => 100}};
-				}
-				elsif($forj == 0){
-					$majorities[$n] = {$c1=>{$c2 => 100}};
-				}
-				elsif($fori > $forj){
-					$majorities[$n] = {$c1=>{$c2 => ($forj/$fori)*100}};
+				
+				if($fori > $forj){
+					$majorities[$n] = {$c1=>{$c2 => $fori,'min'=>$forj}};
 				}
 				else{
-					$majorities[$n] = {$c2=>{$c1 => ($fori/$forj)*100}};
+					$majorities[$n] = {$c2=>{$c1 => $forj,'min'=>$fori}};
 				}
 				$n++;
 			}
@@ -136,29 +131,47 @@ gagnants
 sub getsubkeys{
 	my($a,$b) = @_;#get one keyed/subkeyed hashs
 	my ($a_key,$a_subkey,$b_key,$b_subkey);
-	if(defined($a) && defined($b)){
-		$a_key = (keys $a)[0];
-		$a_subkey =(keys $a->{$a_key})[0];
+	if(defined($a)){
+		my @keys = keys %{$a};
 
-		$b_key = (keys $b)[0];
-		$b_subkey = (keys $b->{$b_key})[0];
+		$a_key = $keys[firstidx {$_ ne 'min'} @keys];
+		@keys = keys %{$a->{$a_key}};
+		$a_subkey = $keys[firstidx {$_ ne 'min'} @keys];
+		if(defined($b)){
+			@keys = keys %{$b};
+			$b_key = $keys[firstidx {$_ ne 'min'} @keys];
+			@keys = keys %{$b->{$b_key}};
+			$b_subkey = $keys[firstidx {$_ ne 'min'} @keys];
 
-		return ($a_key,$a_subkey,$b_key,$b_subkey);
-	}
-	elsif(defined($a) && !defined($b)){
-		$a_key = (keys $a)[0];
-		$a_subkey =(keys $a->{$a_key})[0];
+			return ($a_key,$a_subkey,$b_key,$b_subkey);
+		}
 		return ($a_key,$a_subkey);
 	}
-	else{
+	elsif(!defined($a) && !defined($b)){
 		croak "get subkeys takes at least one arg\n";
 	}
 }
 
 sub majsort{
 	my ($a_key,$a_subkey,$b_key,$b_subkey) = getsubkeys($a,$b);
-
-	$b->{$b_key}->{$b_subkey} <=> $a->{$a_key}->{$a_subkey};
+	print STDERR "b = $b->{$b_key}->{$b_subkey},a =$a->{$a_key}->{$a_subkey}\n";
+	my $aval = $a->{$a_key}->{$a_subkey};
+	my $bval = $b->{$b_key}->{$b_subkey};
+	if($aval < $bval){
+		return 1;
+	}
+	elsif($aval == $bval){
+		my $amin = $a->{$a_key}->{min};
+		my $bmin = $b->{$b_key}->{min};
+		die("reached workplace\n";
+		#here check for the minority size rule in case of equality
+		{
+			return 1;
+		}
+	}
+	else{
+		return -1;
+	}
 }
 
 sub main{
