@@ -158,60 +158,66 @@ sub update_tiebreak{
 		}
 		print STDERR "\n"x3;
 	}
-	else{
+	elsif(!$tiebreak_ready){
+#idée: lire le curvote, et pour chaque vote pas en tie entre plusieurs candidats
+#vérifier que le candidat choisi n'est pas en tie dans le tiebreak
+#si il est en tie dans le tiebreak on le sort afin qu'il soit à droite ou à
+#gauche
 		TIE_ANALYSIS:
-		foreach my $t (@tiebreak){
-			if($t =~ /\d,\d/){
-				print STDERR "we have a tiebreak issue: @tiebreak\n";
-				my @candidates = split /,\s?/, $t;
-				print STDERR "tiebreak candidates = @candidates\n";
-				for my $i (0 .. $#candidates){
-					for my $j (0 .. $#candidates){
-						if($i == $j){
+		foreach my $v (@curvote){
+			if($v =~ /\d,\d/){
+				next;
+				#curvote alreay has a tie
+			}
+			else{
+				print STDERR "can we solve the tie using current vote $v?\n";
+				foreach my $t (@tiebreak){
+					if($t =~ /\d,\d/){
+						print STDERR "we have a tiebreak issue: @tiebreak\n";
+						my @candidates = split /,\s?/, $t;
+						print STDERR "tiebreak candidates = @candidates\n";
+
+						my $chosen_idx = firstidx {$_ == $v} @candidates;
+
+						if($chosen_idx == -1){
+							#can not solve, untied vote no in tie
+							print STDERR "sorry, $v not in @candidates\n";
 							next;
 						}
-						my $split_candidate = $candidates[$i];
+						my $curpos = firstidx {$_ =~ /$t/} @tiebreak;
+						#current position of the tie inside the tiebreak
+
+						#I get the index of the one not in the tie
+						my $split_candidate = $candidates[$chosen_idx];
 						my $idx = firstidx {$_ =~ /$split_candidate/} @curvote;
-						my $jdx = firstidx {$_ =~ /$candidates[$j]/} @curvote;
 
-						my $curpos = firstidx {$_ =~ /$candidates[$j]/} @tiebreak;
-
-						my $tidx = firstidx {$_ == $split_candidate} @candidates;
-
-						splice @candidates, $tidx,1;
-=head
-						if(!is_updown($split_candidate,\@candidates,\@curvote,0,1) &&
-						!is_updown($split_candidate,\@candidates,\@curvote,0,0)){
-							#our split candidate should be between two other
-							#members of the tie
-							print STDERR "$split_candidate should be between two
-							members @candidates\n";
-							next;
-						}
-=cut
-
-
-
+						#remove split candidate
+						splice @candidates, $chosen_idx,1;
 						my $new_tie = join(',',@candidates);
 						print STDERR "extract $split_candidate, now new tie is
 						$new_tie\n";
 
-						if($idx < $jdx){
+						if(is_updown($split_candidate,@candidates,@curvote,0,1)){
+							#our split is before every other tied candidate in
+							#curvote
+							print STDERR "$split_candidate is before everyone
+							else\n";
 							tiebreak_replace(\@tiebreak,$split_candidate,$new_tie,$curpos);
-							goto TIE_ANALYSIS;
 						}
-						elsif($idx>$jdx){
+	
+						elsif(is_updown($split_candidate,@candidates,@curvote,0,0)){
+							print STDERR "$split_candidate is after everyone
+							else\n";
 							tiebreak_replace(\@tiebreak,$new_tie,$split_candidate,$curpos);
-							goto TIE_ANALYSIS;
-							#insert j before i
 						}
 						else{
-							print STDERR "tied vote, both are at the same
-							place\n";
+							print STDERR "split is in between, dying.\n";
+							die(0);
 						}
-
 					}
 				}
+
+
 			}
 		}
 	}
@@ -219,12 +225,11 @@ sub update_tiebreak{
 	$tiebreak_ready = $#tiebreak == $#cdt;#ready when we have 
 	#one candidate per line
 }
-
 sub is_updown{
-	my ($split_candidate,$candidates_ref,$curvote_ref,$idx,$dir) = @_;
-	my @candidates = @$candidates_ref;
-	my @curvote = @$curvote_ref;
+	my ($split_candidate,@candidates,@curvote,$idx,$dir) = @_;
 
+	print STDERR "inside isupdown, index $idx\n";
+	print STDERR "dump of isupdown params: \n".Dumper(\@_);
 	if($idx == $#curvote+1){
 		return 1;
 	}
@@ -235,7 +240,7 @@ sub is_updown{
 	if($dir == 1){#check above in the order
 		if($split_idx < $nextidx){
 			return
-			is_updown($split_candidate,$candidates_ref,$curvote_ref,$idx+1,$dir);
+			is_updown($split_candidate,@candidates,@curvote,$idx+1,$dir);
 		}
 		else{
 			return 0;
@@ -244,7 +249,7 @@ sub is_updown{
 	else{#check below
 		if($split_idx < $nextidx){
 			return
-			is_updown($split_candidate,$candidates_ref,$curvote_ref,$idx+1,$dir);
+			is_updown($split_candidate,@candidates,@curvote,$idx+1,$dir);
 		}
 		else{
 			return 0;
