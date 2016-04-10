@@ -152,11 +152,6 @@ sub update_tiebreak{
 		}
 	}
 	elsif(!$tiebreak_ready){
-#idée: lire le curvote, et pour chaque vote pas en tie entre plusieurs candidats
-#vérifier que le candidat choisi n'est pas en tie dans le tiebreak
-#si il est en tie dans le tiebreak on le sort afin qu'il soit à droite ou à
-#gauche
-		TIE_ANALYSIS:
 		foreach my $v (@curvote){
 			if($v =~ /\d,\d/){
 				next;
