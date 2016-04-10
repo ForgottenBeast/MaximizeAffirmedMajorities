@@ -293,42 +293,63 @@ sub calculate_majorities{
 	return \@majorities;
 }
 
-sub win_order{
-	my $majorities = shift;
-	my @maj = @{$majorities};
-	my @win;
-	my $k = 0;
-	foreach my $i(@maj){
-		my ($a_key,$a_subkey) = getsubkeys($i);
-		my $windx = firstidx {$_ == $a_key} @win;
-		my $lodx = firstidx {$_ == $a_subkey} @win;
-
-		if($windx == -1){#winner not in the ordering
-			if($lodx != -1){#if the loser of the duel is already in the
-			#ordering
-				splice @win,$lodx,0,$a_key;
-				#insert the winner above the loser
-			}
-			else{#none in the current ordering
-				push @win,$a_key;
-				push @win,$a_subkey;
-			}
-		}
-		else{#winner already in the ordering
-			if($lodx == -1){#loser not in the ordering
-				push @win,$a_subkey;
-			}
+sub get_loser{
+	my $hash = shift;
+	foreach my $k (keys %$hash){
+		if ($k ne 'min'){
+			return $k;
 		}
 	}
+}
+
+sub affirm{
+	my($winner,$loser,$finishOver) = @_;
+
+	$finishOver->{$winner}->{$loser} = 1;
+	my @candidates = keys %$finishOver;
+	foreach my $c (@candidates){
+		if($c == $winner || $c == $loser){
+			next;
+		}
+	print STDERR "affirming, looking at $c, winner $winner, loser $loser\n";
+		if($finishOver->{$c}->{$winner} == 1 && $finishOver->{$c}->{$loser} == 0){
+			affirm($c,$loser,$finishOver);
+		}
+		if($finishOver->{$loser}->{$c} == 1 && $finishOver->{$winner}->{$c} == 0){
+			affirm($winner,$c,$finishOver);
+		}
+	}
+}
+
+sub win_order{
+	print STDERR "\n"x4;
+	my ($majorities,$candidates) = @_;
+	my @maj = @{$majorities};
+	my $k = 0;
+
+	my $finishOver = enumerate($candidates);
+	print STDERR Dumper($finishOver);
+
+	foreach my $m (@$majorities){
+		my $winner = (keys %$m)[0];
+		my $loser = get_loser($m->{$winner});;
+		
+		if($finishOver->{$winner}->{$loser} == 0 && $finishOver->{$loser}->{$winner}
+		== 0){
+			print STDERR "affirming $winner win over $loser\n";
+			affirm($winner,$loser,$finishOver);
+		}	
+	}
+
 	print "Here is the tiebreak used: \n";
 	our @tiebreak;
 	foreach my $t (@tiebreak){
 		print "$t\n";
 	}
 	print "Here is the win order:\n";
-	foreach my $c (@win){
-		print "$c\n";
-	}
+
+	
+	print Dumper($finishOver);
 }
 
 sub getsubkeys{
@@ -419,7 +440,7 @@ sub main{
 	@maj = sort majsort @maj;
 	print Dumper(\@maj);
 
-	win_order(\@maj);
+	win_order(\@maj,\@candidates);
 }
 
 if(!defined($ARGV[0])||!defined($ARGV[1])){
