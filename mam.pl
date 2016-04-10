@@ -49,7 +49,6 @@ sub readfile{
 	my $i = 0;
 	my @curvote;
 	while(<$fh>){
-		print "read $_";
 		chomp $_;
 		$curvote[$i] = $_;
 		$i++;
@@ -154,19 +153,26 @@ sub getsubkeys{
 
 sub majsort{
 	my ($a_key,$a_subkey,$b_key,$b_subkey) = getsubkeys($a,$b);
-	print STDERR "b = $b->{$b_key}->{$b_subkey},a =$a->{$a_key}->{$a_subkey}\n";
 	my $aval = $a->{$a_key}->{$a_subkey};
 	my $bval = $b->{$b_key}->{$b_subkey};
 	if($aval < $bval){
 		return 1;
 	}
 	elsif($aval == $bval){
-		my $amin = $a->{$a_key}->{min};
-		my $bmin = $b->{$b_key}->{min};
-		die("reached workplace\n";
+		my $amin = \$a->{$a_key}->{min};
+		my $bmin = \$b->{$b_key}->{min};
+	
+		print STDERR "$aval min $$amin, $bval min $$bmin\n";
+		print STDERR "$aval min $$amin, $bval min $$bmin\n";
 		#here check for the minority size rule in case of equality
+		if($$amin > $$bmin)
 		{
+			print STDERR "got a situation\n $aval, min $$amin\n$bval,$$bmin";
 			return 1;
+		}
+		else{
+			#use tiebreak
+			return 0;
 		}
 	}
 	else{
@@ -192,6 +198,9 @@ sub main{
 	}
 
 	my @maj = @{calculate_majorities($hash)};
+	print "before sort:\n";
+	print Dumper(\@maj);
+	#if fucked up, you left the editions inside majsort
 	@maj = sort majsort @maj;
 	print Dumper(\@maj);
 
