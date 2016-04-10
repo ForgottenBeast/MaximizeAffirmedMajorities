@@ -328,7 +328,6 @@ sub win_order{
 	my $k = 0;
 
 	my $finishOver = enumerate($candidates);
-	print STDERR Dumper($finishOver);
 
 	foreach my $m (@$majorities){
 		my $winner = (keys %$m)[0];
@@ -341,15 +340,7 @@ sub win_order{
 		}	
 	}
 
-	print "Here is the tiebreak used: \n";
-	our @tiebreak;
-	foreach my $t (@tiebreak){
-		print "$t\n";
-	}
-	print "Here is the win order:\n";
-
-	
-	print Dumper($finishOver);
+	return $finishOver;
 }
 
 sub getsubkeys{
@@ -416,6 +407,35 @@ sub majsort{
 	}
 }
 
+sub scoresort{
+	my $a_score = (keys %$a)[0];
+	my $b_score = (keys %$b)[0];
+	
+	return $b->{$b_score} <=> $a->{$a_score};
+}
+
+sub relook{
+	my $finishOrder = shift;
+	my @candidates = keys %$finishOrder;
+	my @tmp_results;
+	foreach my $c (@candidates){
+		my $score = 0;
+		foreach my $adv (keys %{$finishOrder->{$c}}){
+			$score += $finishOrder->{$c}->{$adv};
+		}
+		print STDERR "$c has a score of $score\n";
+		push @tmp_results, {$c => $score};
+	}
+
+	@tmp_results = sort scoresort @tmp_results;
+	my @results;
+	foreach my $r (@tmp_results){
+		my $candidate = (keys %$r)[0];
+		push @results, $candidate;
+	}
+	return \@results;
+}
+
 sub main{
 	my $nbc = shift;
 	my @candidates;
@@ -440,7 +460,17 @@ sub main{
 	@maj = sort majsort @maj;
 	print Dumper(\@maj);
 
-	win_order(\@maj,\@candidates);
+	my $finish_order = win_order(\@maj,\@candidates);
+	my $finish_table = relook($finish_order);
+	print STDERR Dumper($finish_order);
+	print "Here is the tiebreak used: \n";
+	foreach my $t (@tiebreak){
+		print "$t\n";
+	}
+	print "Here is the win order:\n";
+	for my $i (0 .. $#$finish_table){
+		print " $finish_table->[$i]\n";
+	}
 }
 
 if(!defined($ARGV[0])||!defined($ARGV[1])){
