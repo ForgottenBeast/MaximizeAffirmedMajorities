@@ -24,27 +24,18 @@ sub make_ballots{
 	}
 
 	for my $i (0 .. $nb){
-		my $same_rank = "";
 		my @ballot = shuffle(@candidates);
 		open(my $fh, '>',$i.".vt");
 		foreach my $c(@ballot){
+			my $line_end = "\n";
 			if(int(rand(6)) == 0){#leave all other candidates out
-				print STDERR "leaving out in $i.vt\n";
 				last;
 			}
 			elsif(int(rand(2)) == 0){#put one or more candidate on this row
-				if($same_rank eq ""){
-					$same_rank = $c;
-					next;
-				}
-				else{
-					print $fh "$c,$same_rank\n";
-					print STDERR "putting candidates together in $i.vt\n
-					$c,$same_rank\n";
-				}
+				$line_end = ",";
 			}
 			else{
-				print $fh "$c\n";
+				print $fh $c.$line_end;
 			}
 		}
 		close($fh);
@@ -168,6 +159,7 @@ sub update_tiebreak{
 		print STDERR "\n"x3;
 	}
 	else{
+		TIE_ANALYSIS:
 		foreach my $t (@tiebreak){
 			if($t =~ /\d,\d/){
 				print STDERR "we have a tiebreak issue: @tiebreak\n";
@@ -175,78 +167,96 @@ sub update_tiebreak{
 				print STDERR "tiebreak candidates = @candidates\n";
 				for my $i (0 .. $#candidates){
 					for my $j (0 .. $#candidates){
-						my $tidx = firstidx {$_ =~ /$candidates[$i]/} @tiebreak;
-						my $tjdx = firstidx {$_ =~ /$candidates[$j]/} @tiebreak;
-						if($i != $j && $tidx == $tjdx){
-							#lets check if the current vote can solve
-							#the tiebreak equality issue
-							print STDERR "working on tiebreak candidate $candidates[$i]
-							and $candidates[$j]\n";
-							my $idx = firstidx {$_ =~ /$candidates[$i]/} @curvote;
-							my $jdx = firstidx {$_ =~ /$candidates[$j]/} @curvote;
+						if($i == $j){
+							next;
+						}
+						my $split_candidate = $candidates[$i];
+						my $idx = firstidx {$_ =~ /$split_candidate/} @curvote;
+						my $jdx = firstidx {$_ =~ /$candidates[$j]/} @curvote;
 
-							my $curpos = firstidx {$_ eq $t} @tiebreak;
-							print STDERR "issue with $t at $curpos\n
-							idx = $idx, jdx = $jdx\n";
-							if($idx == -1 || $jdx == $idx || $jdx == -1){
-								#the vote itself is tied
-								print STDERR "vote is tied\n";
-								last;
-							}
-							if($idx < $jdx){
+						my $curpos = firstidx {$_ =~ /$candidates[$j]/} @tiebreak;
+
+						my $tidx = firstidx {$_ == $split_candidate} @candidates;
+
+						splice @candidates, $tidx,1;
+=head
+						if(!is_updown($split_candidate,\@candidates,\@curvote,0,1) &&
+						!is_updown($split_candidate,\@candidates,\@curvote,0,0)){
+							#our split candidate should be between two other
+							#members of the tie
+							print STDERR "$split_candidate should be between two
+							members @candidates\n";
+							next;
+						}
+=cut
 
 
 
-#le problème c'est que je pars du principe qu'il n'y a qu'un seul autre membre
-#au meme étage du tie break donc avec 1,2,3 et 1 2 3 je me retrouve à perdre un
-#des candidats
+						my $new_tie = join(',',@candidates);
+						print STDERR "extract $split_candidate, now new tie is
+						$new_tie\n";
 
-#quand j'ai 2 3,1 et que je veux le résoudre
-# avec 3,2 1 j'ai un problème aussi
-																#insert i before j
-								tiebreak_replace(\@tiebreak,$candidates[$j],$candidates[$i],$curpos);
-							}
-							else{
-								tiebreak_replace(\@tiebreak,$candidates[$i],$candidates[$j],$curpos);
-								#insert j before i
-							}
+						if($idx < $jdx){
+							tiebreak_replace(\@tiebreak,$split_candidate,$new_tie,$curpos);
+							goto TIE_ANALYSIS;
+						}
+						elsif($idx>$jdx){
+							tiebreak_replace(\@tiebreak,$new_tie,$split_candidate,$curpos);
+							goto TIE_ANALYSIS;
+							#insert j before i
 						}
 						else{
-							print STDERR "already split $tidx et $tjdx\n";
+							print STDERR "tied vote, both are at the same
+							place\n";
 						}
+
 					}
 				}
 			}
 		}
 	}
-	print STDERR "tiebreak currently = \n";
-	print STDERR "@tiebreak\n";
-
 	my @cdt = keys %{$votes};
-	print STDERR "total entries in tiebreak = $#tiebreak, candidates = $#cdt\n";
 	$tiebreak_ready = $#tiebreak == $#cdt;#ready when we have 
-	print STDERR "tiebreak ready now equal $tiebreak_ready\n";
 	#one candidate per line
 }
 
-#possibilité: je split, j'extrait un seul, je regarde si il est au dessus ou en
-#dessous des autres membres du split
-#je join le contenu moins le membre que j'ai retiré
-#j'insère
-#je recommence tant que des indices différents pour les membres du split
+sub is_updown{
+	my ($split_candidate,$candidates_ref,$curvote_ref,$idx,$dir) = @_;
+	my @candidates = @$candidates_ref;
+	my @curvote = @$curvote_ref;
+
+	if($idx == $#curvote+1){
+		return 1;
+	}
+
+	my $split_idx = firstidx {$_ =~ /$split_candidate/} @curvote;
+	my $nextidx = firstidx {$_ =~ /$candidates[$idx]/} @curvote;
+
+	if($dir == 1){#check above in the order
+		if($split_idx < $nextidx){
+			return
+			is_updown($split_candidate,$candidates_ref,$curvote_ref,$idx+1,$dir);
+		}
+		else{
+			return 0;
+		}
+	}
+	else{#check below
+		if($split_idx < $nextidx){
+			return
+			is_updown($split_candidate,$candidates_ref,$curvote_ref,$idx+1,$dir);
+		}
+		else{
+			return 0;
+		}
+	}
+}
+
 sub tiebreak_replace{
 	my ($tiebreak, $cd1,$cd2,$curpos) = @_;
-	print STDERR "$cd1 is after $cd2\n";
+	print STDERR "$cd2 is after $cd1\n";
 	
-	my $issue = $tiebreak->[$curpos];
-	print STDERR "current tiebreak issue = $issue \n";
-
-	$issue =~ s/($cd1,?|,$cd1\z|,$cd1)//;
-	print STDERR "issue after taking out the problem part: $issue\n";
-	$tiebreak->[$curpos] = $issue;
-	print STDERR "tiebreak before insert =
-	@$tiebreak\n";
-	splice @{$tiebreak},$curpos,0,$cd1;
+	splice @{$tiebreak},$curpos,1,($cd1,$cd2);
 	print STDERR "tiebreak after insert =
 	@$tiebreak\n";
 
@@ -388,6 +398,7 @@ sub main{
 	my $hash = enumerate(\@candidates);
 	my @files = shuffle(glob("*.vt"));
 	foreach my $f (@files){
+		print STDERR "reading $f\n";
 		open(my $fh,'<',$f);
 		readfile($hash,$fh);
 		close($fh);
@@ -411,6 +422,6 @@ if(!defined($ARGV[0])||!defined($ARGV[1])){
 
 our @tiebreak;
 our $tiebreak_ready = 0;
-#make_ballots($ARGV[1],$ARGV[0]);
+make_ballots($ARGV[1],$ARGV[0]);
 main($ARGV[0]);
 #del_ballots;
