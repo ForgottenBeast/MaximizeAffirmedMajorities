@@ -5,10 +5,10 @@ use autodie;
 use Data::Dumper;
 use List::Util qw(shuffle);
 use List::MoreUtils qw(firstidx);
-use GetOpt::Long;
+use Getopt::Long;
 
 sub del_ballots{
-	for my $f(glob("*.vt")){
+	for my $f(glob("*.bt")){
 		unlink $f;
 	}
 }
@@ -25,7 +25,7 @@ sub make_ballots{
 
 	for my $i (0 .. $nb){
 		my @ballot = shuffle(@candidates);
-		open(my $fh, '>',$i.".vt");
+		open(my $fh, '>',$i.".bt");
 		foreach my $c(@ballot){
 			my $line_end = "\n";
 			if(int(rand(6)) == 0){#leave all other candidates out
@@ -416,7 +416,7 @@ sub main{
 	}
 
 	my $hash = enumerate(\@candidates);
-	my @files = shuffle(glob("*.vt"));
+	my @files = shuffle(glob("*.bt"));
 	foreach my $f (@files){
 		open(my $fh,'<',$f);
 		readfile($hash,$fh);
@@ -440,14 +440,30 @@ sub main{
 	}
 }
 
-if(!defined($ARGV[0])||!defined($ARGV[1])){
-	print 'usage: ./mam.pl $number_of_candidates $number_of_ballots'."\n";
-	exit(0);
-}
 
 our @tiebreak;
 our $tiebreak_ready = 0;
 
-make_ballots($ARGV[1],$ARGV[0]);
-main($ARGV[0]);
-del_ballots;
+my($autogen,$delete,$candidates,$help);
+GetOptions("autogen|a=i" => \$autogen,
+		   "delete|d" => \$delete,
+		   "candidates|c=i" =>\$candidates,
+		   "help|h" =>\$help) or exit;
+
+if(defined($help)||!defined($candidates)){
+	print "to run a voting simulation with randomly generated ballots:\n";
+	print "./mam.pl --(autogen|a) number_of_generated_ballots --(candidates|c)
+	number_of_candidates\n\n";
+	print "--delete option will remove all .bt files in the same directory after
+	computation\n\n";
+	print "candidate option is obligatory\n";
+	exit;
+}
+
+if(defined($autogen)){
+	make_ballots($autogen,$candidates);
+}
+main($candidates);
+if(defined($delete)){
+	del_ballots;
+}
