@@ -197,7 +197,7 @@ sub update_tiebreak{
 						print STDERR "extract $split_candidate, now new tie is
 						$new_tie\n";
 
-						if(is_updown($split_candidate,@candidates,@curvote,0,1)){
+						if(is_updown($split_candidate,\@candidates,\@curvote,0,1)){
 							#our split is before every other tied candidate in
 							#curvote
 							print STDERR "$split_candidate is before everyone
@@ -205,7 +205,7 @@ sub update_tiebreak{
 							tiebreak_replace(\@tiebreak,$split_candidate,$new_tie,$curpos);
 						}
 	
-						elsif(is_updown($split_candidate,@candidates,@curvote,0,0)){
+						elsif(is_updown($split_candidate,\@candidates,\@curvote,0,0)){
 							print STDERR "$split_candidate is after everyone
 							else\n";
 							tiebreak_replace(\@tiebreak,$new_tie,$split_candidate,$curpos);
@@ -226,21 +226,19 @@ sub update_tiebreak{
 	#one candidate per line
 }
 sub is_updown{
-	my ($split_candidate,@candidates,@curvote,$idx,$dir) = @_;
+	my ($split_candidate,$candidates,$curvote,$idx,$dir) = @_;
 
-	print STDERR "inside isupdown, index $idx\n";
-	print STDERR "dump of isupdown params: \n".Dumper(\@_);
-	if($idx == $#curvote+1){
+	if($idx > $#$candidates){
 		return 1;
 	}
 
-	my $split_idx = firstidx {$_ =~ /$split_candidate/} @curvote;
-	my $nextidx = firstidx {$_ =~ /$candidates[$idx]/} @curvote;
+	my $split_idx = firstidx {$_ =~ /$split_candidate/} @$curvote;
+	my $nextidx = firstidx {$_ =~ /$candidates->[$idx]/} @$curvote;
 
 	if($dir == 1){#check above in the order
 		if($split_idx < $nextidx){
 			return
-			is_updown($split_candidate,@candidates,@curvote,$idx+1,$dir);
+			is_updown($split_candidate,$candidates,$curvote,$idx+1,$dir);
 		}
 		else{
 			return 0;
@@ -249,7 +247,7 @@ sub is_updown{
 	else{#check below
 		if($split_idx < $nextidx){
 			return
-			is_updown($split_candidate,@candidates,@curvote,$idx+1,$dir);
+			is_updown($split_candidate,$candidates,$curvote,$idx+1,$dir);
 		}
 		else{
 			return 0;
@@ -322,6 +320,11 @@ sub win_order{
 			}
 		}
 	}
+	print "Here is the tiebreak used: \n";
+	our @tiebreak;
+	foreach my $t (@tiebreak){
+		print "$t\n";
+	}
 	print "Here is the win order:\n";
 	foreach my $c (@win){
 		print "$c\n";
@@ -363,8 +366,8 @@ sub majsort{
 		my $amin = $a->{$a_key}->{min};
 		my $bmin = $b->{$b_key}->{min};
 	
-		print STDERR "$aval min $amin, $bval min $bmin\n";
-		print STDERR "$aval min $amin, $bval min $bmin\n";
+		print STDERR "$aval min $amin, $bval min $bmin for $a_key vs $a_subkey\n";
+		print STDERR "$aval min $amin, $bval min $bmin for $b_key vs $b_subkey\n";
 		#here check for the minority size rule in case of equality
 		#the majority opposed by the smallest minority has precedence
 		if($amin > $bmin)
@@ -377,7 +380,8 @@ sub majsort{
 			our @tiebreak;
 			my $indb = firstidx {$_ == $a_key} @tiebreak;
 			my $inda =firstidx {$_ == $b_key} @tiebreak;
-			print STDERR "solving using tiebreak for $a_key and $b_key\n";
+			print STDERR "solving using tiebreak for $a_key vs $a_subkey and
+			$b_key vs $b_subkey\n";
 			if($inda < $indb){
 				return 1;
 			}
@@ -411,8 +415,6 @@ sub main{
 	our @tiebreak;
 	print STDERR "tiebreak = @tiebreak\n";
 	my @maj = @{calculate_majorities($hash)};
-	print "before sort:\n";
-	print Dumper(\@maj);
 	#if fucked up, you left the editions inside majsort
 	@maj = sort majsort @maj;
 	print Dumper(\@maj);
@@ -429,4 +431,4 @@ our @tiebreak;
 our $tiebreak_ready = 0;
 make_ballots($ARGV[1],$ARGV[0]);
 main($ARGV[0]);
-#del_ballots;
+del_ballots;
