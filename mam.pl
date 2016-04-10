@@ -5,7 +5,7 @@ use autodie;
 use Data::Dumper;
 use List::Util qw(shuffle);
 use List::MoreUtils qw(firstidx);
-use Carp;
+use GetOpt::Long;
 
 sub del_ballots{
 	for my $f(glob("*.vt")){
@@ -146,17 +146,10 @@ sub update_tiebreak{
 	my ($cv,$votes)= @_;
 	my @curvote = @{$cv};
 	our( @tiebreak,$tiebreak_ready);
-	print STDERR "here is the vote we are looking at\n";
-	foreach my $v (@curvote){
-		print STDERR" $v\n"
-	}
 	if(!@tiebreak){#empty tiebreak
-		print STDERR "empty tiebreak, pushing\n";
 		foreach my $v (@curvote){
 			push @tiebreak,$v;
-			print STDERR "$v\n";
 		}
-		print STDERR "\n"x3;
 	}
 	elsif(!$tiebreak_ready){
 #idée: lire le curvote, et pour chaque vote pas en tie entre plusieurs candidats
@@ -170,18 +163,14 @@ sub update_tiebreak{
 				#curvote alreay has a tie
 			}
 			else{
-				print STDERR "can we solve the tie using current vote $v?\n";
 				foreach my $t (@tiebreak){
 					if($t =~ /\d,\d/){
-						print STDERR "we have a tiebreak issue: @tiebreak\n";
 						my @candidates = split /,\s?/, $t;
-						print STDERR "tiebreak candidates = @candidates\n";
 
 						my $chosen_idx = firstidx {$_ == $v} @candidates;
 
 						if($chosen_idx == -1){
 							#can not solve, untied vote no in tie
-							print STDERR "sorry, $v not in @candidates\n";
 							next;
 						}
 						my $curpos = firstidx {$_ =~ /$t/} @tiebreak;
@@ -194,25 +183,15 @@ sub update_tiebreak{
 						#remove split candidate
 						splice @candidates, $chosen_idx,1;
 						my $new_tie = join(',',@candidates);
-						print STDERR "extract $split_candidate, now new tie is
-						$new_tie\n";
 
 						if(is_updown($split_candidate,\@candidates,\@curvote,0,1)){
 							#our split is before every other tied candidate in
 							#curvote
-							print STDERR "$split_candidate is before everyone
-							else\n";
 							tiebreak_replace(\@tiebreak,$split_candidate,$new_tie,$curpos);
 						}
 	
 						elsif(is_updown($split_candidate,\@candidates,\@curvote,0,0)){
-							print STDERR "$split_candidate is after everyone
-							else\n";
 							tiebreak_replace(\@tiebreak,$new_tie,$split_candidate,$curpos);
-						}
-						else{
-							print STDERR "split is in between, dying.\n";
-							die(0);
 						}
 					}
 				}
@@ -257,11 +236,8 @@ sub is_updown{
 
 sub tiebreak_replace{
 	my ($tiebreak, $cd1,$cd2,$curpos) = @_;
-	print STDERR "$cd2 is after $cd1\n";
 	
 	splice @{$tiebreak},$curpos,1,($cd1,$cd2);
-	print STDERR "tiebreak after insert =
-	@$tiebreak\n";
 
 }
 
@@ -311,7 +287,6 @@ sub affirm{
 		if($c == $winner || $c == $loser){
 			next;
 		}
-	print STDERR "affirming, looking at $c, winner $winner, loser $loser\n";
 		if($finishOver->{$c}->{$winner} == 1 && $finishOver->{$c}->{$loser} == 0){
 			affirm($c,$loser,$finishOver);
 		}
@@ -322,7 +297,6 @@ sub affirm{
 }
 
 sub win_order{
-	print STDERR "\n"x4;
 	my ($majorities,$candidates) = @_;
 	my @maj = @{$majorities};
 	my $k = 0;
@@ -335,7 +309,6 @@ sub win_order{
 		
 		if($finishOver->{$winner}->{$loser} == 0 && $finishOver->{$loser}->{$winner}
 		== 0){
-			print STDERR "affirming $winner win over $loser\n";
 			affirm($winner,$loser,$finishOver);
 		}	
 	}
@@ -363,7 +336,7 @@ sub getsubkeys{
 		return ($a_key,$a_subkey);
 	}
 	elsif(!defined($a) && !defined($b)){
-		croak "get subkeys takes at least one arg\n";
+		die("get subkeys takes at least one arg\n");
 	}
 }
 
@@ -378,13 +351,11 @@ sub majsort{
 		my $amin = $a->{$a_key}->{min};
 		my $bmin = $b->{$b_key}->{min};
 	
-		print STDERR "$aval min $amin, $bval min $bmin for $a_key vs $a_subkey\n";
-		print STDERR "$aval min $amin, $bval min $bmin for $b_key vs $b_subkey\n";
 		#here check for the minority size rule in case of equality
 		#the majority opposed by the smallest minority has precedence
 		if($amin > $bmin)
 		{
-			print STDERR "solving using minority rules\n";
+			print STDERR "solving $a_key -> $a_subkey vs $b_key -> $b_subkey using minority rules\n";
 			return 1;
 		}
 		else{
@@ -423,7 +394,6 @@ sub relook{
 		foreach my $adv (keys %{$finishOrder->{$c}}){
 			$score += $finishOrder->{$c}->{$adv};
 		}
-		print STDERR "$c has a score of $score\n";
 		push @tmp_results, {$c => $score};
 	}
 
@@ -448,28 +418,25 @@ sub main{
 	my $hash = enumerate(\@candidates);
 	my @files = shuffle(glob("*.vt"));
 	foreach my $f (@files){
-		print STDERR "reading $f\n";
 		open(my $fh,'<',$f);
 		readfile($hash,$fh);
 		close($fh);
 	}
-	our @tiebreak;
-	print STDERR "tiebreak = @tiebreak\n";
 	my @maj = @{calculate_majorities($hash)};
-	#if fucked up, you left the editions inside majsort
 	@maj = sort majsort @maj;
-	print Dumper(\@maj);
+	print STDERR "majorities list:\n".Dumper(\@maj);
 
 	my $finish_order = win_order(\@maj,\@candidates);
 	my $finish_table = relook($finish_order);
-	print STDERR Dumper($finish_order);
-	print "Here is the tiebreak used: \n";
+	print STDERR "Finish order:\n".Dumper($finish_order);
+	our @tiebreak;
+	print STDERR "Tiebreak:\n";
 	foreach my $t (@tiebreak){
-		print "$t\n";
+		print STDERR "$t\n";
 	}
 	print "Here is the win order:\n";
 	for my $i (0 .. $#$finish_table){
-		print " $finish_table->[$i]\n";
+		print "$finish_table->[$i]\n";
 	}
 }
 
@@ -480,6 +447,7 @@ if(!defined($ARGV[0])||!defined($ARGV[1])){
 
 our @tiebreak;
 our $tiebreak_ready = 0;
+
 make_ballots($ARGV[1],$ARGV[0]);
 main($ARGV[0]);
 del_ballots;
