@@ -54,6 +54,13 @@ sub readfile{
 		$i++;
 	}
 	for my $i (0 .. $#curvote){
+	our $tiebreak_ready;
+		if(!$tiebreak_ready){
+			our @tiebreak;
+			push @tiebreak,$curvote[$i];
+			my @cdt = keys %{$votes};
+			$tiebreak_ready = $#tiebreak == $#cdt;
+		}
 		for my $j ($i+1 .. $#curvote){
 			$votes->{$curvote[$i]}->{$curvote[$j]}++;
 		}
@@ -159,20 +166,30 @@ sub majsort{
 		return 1;
 	}
 	elsif($aval == $bval){
-		my $amin = \$a->{$a_key}->{min};
-		my $bmin = \$b->{$b_key}->{min};
+		my $amin = $a->{$a_key}->{min};
+		my $bmin = $b->{$b_key}->{min};
 	
-		print STDERR "$aval min $$amin, $bval min $$bmin\n";
-		print STDERR "$aval min $$amin, $bval min $$bmin\n";
+		print STDERR "$aval min $amin, $bval min $bmin\n";
+		print STDERR "$aval min $amin, $bval min $bmin\n";
 		#here check for the minority size rule in case of equality
-		if($$amin > $$bmin)
+		#the majority opposed by the smallest minority has precedence
+		if($amin > $bmin)
 		{
-			print STDERR "got a situation\n $aval, min $$amin\n$bval,$$bmin";
+			print STDERR "solving using minority rules\n";
 			return 1;
 		}
 		else{
 			#use tiebreak
-			return 0;
+			our @tiebreak;
+			my $indb = firstidx {$_ == $a_key} @tiebreak;
+			my $inda =firstidx {$_ == $b_key} @tiebreak;
+			print STDERR "solving using tiebreak for $a_key and $b_key\n";
+			if($inda < $indb){
+				return 1;
+			}
+			else{
+				return -1;
+			}
 		}
 	}
 	else{
@@ -196,7 +213,8 @@ sub main{
 		readfile($hash,$fh);
 		close($fh);
 	}
-
+	our @tiebreak;
+	print STDERR "tiebreak = @tiebreak\n";
 	my @maj = @{calculate_majorities($hash)};
 	print "before sort:\n";
 	print Dumper(\@maj);
@@ -212,7 +230,8 @@ if(!defined($ARGV[0])||!defined($ARGV[1])){
 	exit(0);
 }
 
-
+our @tiebreak;
+our $tiebreak_ready = 0;
 make_ballots($ARGV[1],$ARGV[0]);
 main($ARGV[0]);
 del_ballots;
