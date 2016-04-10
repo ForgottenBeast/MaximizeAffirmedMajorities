@@ -38,8 +38,9 @@ sub make_ballots{
 					next;
 				}
 				else{
-					print $fh "$c,$same_rank";
-					print STDERR "putting candidates together in $i.vt\n";
+					print $fh "$c,$same_rank\n";
+					print STDERR "putting candidates together in $i.vt\n
+					$c,$same_rank\n";
 				}
 			}
 			else{
@@ -66,24 +67,19 @@ sub vote_against_below{
 	my ($startidx,$cv,$votes,$candidate) = @_;
 	my $c = $candidate;
 	my @curvote = @{$cv};
-	print STDERR "working on candidate $c\n";
 	for my $j($startidx .. $#curvote){
 
 	#if on the lines below I encounter multiple candidates
 	#I count a vote against all of them
 		if($curvote[$j] =~ /^\d,\d/){
-			print STDERR "loser below is multiple\n";
 			my @losers = split /,/,$curvote[$j];
-			print STDERR @losers;
 			foreach my $l (@losers){
-				print STDERR "add vote for $c against $l\n";
 				$votes->{$c}->{$l}++;
 			}
 		}
 		
 		#if it is a normal case then I deal with it
 		else{
-			print STDERR "add vote for $c against $curvote[$j]\n";
 			$votes->{$c}->{$curvote[$j]}++;
 		}
 	}
@@ -95,23 +91,17 @@ sub readfile{
 	my @curvote;
 
 	#prepare a hash to check for left out candidates
-	print STDERR "\n\nseen setup\n";
 	my %seen;
 	my @keys = keys %{$votes};
 	foreach my $k (@keys){
-		print STDERR "adding key $k\n";
 		$seen{$k} = 0;
 	}
-	print STDERR "seen setup done \n\n\n";
 	while(<$fh>){
 		chomp $_;
 		$curvote[$i] = $_;
 		if($curvote[$i] =~ /\A\d,/){
-			print STDERR "got a match on $curvote[$i]\n";
 			my @votes = split /,\s?/, $curvote[$i];
-			print STDERR "got multi votes: @votes";
 			foreach my $v(@votes){
-				print STDERR "adding multivote key $v to seen\n";
 				$seen{$v} = 1;
 			}
 		}
@@ -120,17 +110,12 @@ sub readfile{
 		}
 		$i++;
 	}
-	print STDERR "curvote as of end of file:\n";
-	foreach my $v (@curvote){
-		print STDERR "$v\n";
-	}
 
 	#all candidates left out of the ballot are accounted for as if they
 	#were added together at the lowest possible position
 	my $leftovers = "";
 	foreach my $k (@keys){
 		if(!$seen{$k}){
-			print STDERR "I have not seen $k yet, adding to leftover\n";
 			if($leftovers =~ /\d\z/){
 				$leftovers = $leftovers . ",$k";
 			}
@@ -140,23 +125,15 @@ sub readfile{
 		}
 	}
 	if($leftovers ne ""){
-		print STDERR "got leftover string: $leftovers\n";
 		$curvote[$i] = $leftovers;
 	}
 
 
-	print STDERR "\nafter adding leftovers, curvote = \n";
-	foreach my $v(@curvote){
-		print STDERR "$v\n";
-	}
-
 	for my $i (0 .. $#curvote){
 		my @candidates;
 		if($curvote[$i] =~ /^\d,\s?\d/){#more than one candidate on this line
-			print STDERR "got a match on skivvy curvote: $curvote[$i]\n";
 			#I split the candidate list into an array
 			@candidates = split /,\s?/,$curvote[$i];
-			print STDERR "splat it in @candidates\n";
 
 			#foreach candidate in the list I count one vote for him
 			#against everyone below him
@@ -178,7 +155,10 @@ sub update_tiebreak{
 	my ($cv,$votes)= @_;
 	my @curvote = @{$cv};
 	our( @tiebreak,$tiebreak_ready);
-
+	print STDERR "here is the vote we are looking at\n";
+	foreach my $v (@curvote){
+		print STDERR" $v\n"
+	}
 	if(!@tiebreak){#empty tiebreak
 		print STDERR "empty tiebreak, pushing\n";
 		foreach my $v (@curvote){
@@ -195,32 +175,44 @@ sub update_tiebreak{
 				print STDERR "tiebreak candidates = @candidates\n";
 				for my $i (0 .. $#candidates){
 					for my $j (0 .. $#candidates){
-						if($i != $j){
+						my $tidx = firstidx {$_ =~ /$candidates[$i]/} @tiebreak;
+						my $tjdx = firstidx {$_ =~ /$candidates[$j]/} @tiebreak;
+						if($i != $j && $tidx == $tjdx){
 							#lets check if the current vote can solve
 							#the tiebreak equality issue
 							print STDERR "working on tiebreak candidate $candidates[$i]
 							and $candidates[$j]\n";
 							my $idx = firstidx {$_ =~ /$candidates[$i]/} @curvote;
 							my $jdx = firstidx {$_ =~ /$candidates[$j]/} @curvote;
+
 							my $curpos = firstidx {$_ eq $t} @tiebreak;
-							print STDERR "issue with $t at $curpos\n";
+							print STDERR "issue with $t at $curpos\n
+							idx = $idx, jdx = $jdx\n";
 							if($idx == -1 || $jdx == $idx || $jdx == -1){
 								#the vote itself is tied
 								print STDERR "vote is tied\n";
 								last;
 							}
 							if($idx < $jdx){
-								print STDERR "ci is before cj\n";
-								$tiebreak[$curpos] = $j;
-								splice @tiebreak,$curpos,0,$candidates[$i];
-								#insert i before j
+
+
+
+#le problème c'est que je pars du principe qu'il n'y a qu'un seul autre membre
+#au meme étage du tie break donc avec 1,2,3 et 1 2 3 je me retrouve à perdre un
+#des candidats
+
+#quand j'ai 2 3,1 et que je veux le résoudre
+# avec 3,2 1 j'ai un problème aussi
+																#insert i before j
+								tiebreak_replace(\@tiebreak,$candidates[$j],$candidates[$i],$curpos);
 							}
 							else{
-								print STDERR "ci is after cj\n";
-								$tiebreak[$curpos] = $i;
-								splice @tiebreak,$curpos,0,$candidates[$j];
+								tiebreak_replace(\@tiebreak,$candidates[$i],$candidates[$j],$curpos);
 								#insert j before i
 							}
+						}
+						else{
+							print STDERR "already split $tidx et $tjdx\n";
 						}
 					}
 				}
@@ -231,8 +223,33 @@ sub update_tiebreak{
 	print STDERR "@tiebreak\n";
 
 	my @cdt = keys %{$votes};
+	print STDERR "total entries in tiebreak = $#tiebreak, candidates = $#cdt\n";
 	$tiebreak_ready = $#tiebreak == $#cdt;#ready when we have 
+	print STDERR "tiebreak ready now equal $tiebreak_ready\n";
 	#one candidate per line
+}
+
+#possibilité: je split, j'extrait un seul, je regarde si il est au dessus ou en
+#dessous des autres membres du split
+#je join le contenu moins le membre que j'ai retiré
+#j'insère
+#je recommence tant que des indices différents pour les membres du split
+sub tiebreak_replace{
+	my ($tiebreak, $cd1,$cd2,$curpos) = @_;
+	print STDERR "$cd1 is after $cd2\n";
+	
+	my $issue = $tiebreak->[$curpos];
+	print STDERR "current tiebreak issue = $issue \n";
+
+	$issue =~ s/($cd1,?|,$cd1\z|,$cd1)//;
+	print STDERR "issue after taking out the problem part: $issue\n";
+	$tiebreak->[$curpos] = $issue;
+	print STDERR "tiebreak before insert =
+	@$tiebreak\n";
+	splice @{$tiebreak},$curpos,0,$cd1;
+	print STDERR "tiebreak after insert =
+	@$tiebreak\n";
+
 }
 
 sub calculate_majorities{
