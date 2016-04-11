@@ -41,6 +41,14 @@ sub make_ballots{
 		close($fh);
 	}
 }
+
+sub rand_tiebreak_set{
+	our @tiebreak;
+	my ($cand_ref,$votes) = @_;
+	my @ballot = shuffle(@{$cand_ref});
+	update_tiebreak(\@ballot,$votes);
+}
+
 sub enumerate{
 	my $candidates = shift;
 	my $votehash = {};
@@ -363,6 +371,16 @@ sub majsort{
 			if($inda < $indb){
 				return 1;
 			}
+			elsif($inda == $indb){
+				my $indb = firstidx {$_ == $a_subkey} @tiebreak;
+				my $inda =firstidx {$_ == $b_subkey} @tiebreak;
+				if($inda < $indb){
+					return 1;
+				}
+				else{
+					return -1;
+				}
+			}
 			else{
 				return -1;
 			}
@@ -416,6 +434,11 @@ sub main{
 		open(my $fh,'<',$f);
 		readfile($hash,$fh);
 		close($fh);
+	}
+
+	our $tiebreak_ready;
+	while(!$tiebreak_ready){
+		rand_tiebreak_set(\@candidates,$hash);
 	}
 	my @maj = @{calculate_majorities($hash)};
 	@maj = sort majsort @maj;
