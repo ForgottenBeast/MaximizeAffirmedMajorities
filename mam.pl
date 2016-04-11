@@ -438,6 +438,7 @@ sub main{
 
 	our $tiebreak_ready;
 	while(!$tiebreak_ready){
+		print STDERR "autocompleting tiebreaker with strict random ballot\n";
 		rand_tiebreak_set(\@candidates,$hash);
 	}
 	my @maj = @{calculate_majorities($hash)};
