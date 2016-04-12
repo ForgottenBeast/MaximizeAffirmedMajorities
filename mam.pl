@@ -74,7 +74,7 @@ sub vote_against_below{
 
 	#if on the lines below I encounter multiple candidates
 	#I count a vote against all of them
-		if($curvote[$j] =~ /^\d+,\d+/){
+		if($curvote[$j] =~ /^\d+\s?,\s?\d+/){
 			my @losers = split /,/,$curvote[$j];
 			foreach my $l (@losers){
 				$votes->{$c}->{$l}++;
@@ -102,7 +102,7 @@ sub readfile{
 	while(<$fh>){
 		chomp $_;
 		$curvote[$i] = $_;
-		if($curvote[$i] =~ /\A\d+,/){
+		if($curvote[$i] =~ /\A\d+\s?,\s?/){
 			my @votes = split /\s?,\s?/, $curvote[$i];
 			foreach my $v(@votes){
 				$seen{$v} = 1;
@@ -165,7 +165,7 @@ sub update_tiebreak{
 	}
 	elsif(!$tiebreak_ready){
 		foreach my $v (@curvote){
-			if($v =~ /\d+,\d+/){
+			if($v =~ /\d+\s?,\s?\d+/){
 				next;
 				#curvote alreay has a tie
 			}
