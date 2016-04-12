@@ -590,6 +590,7 @@ sub main{
 }
 
 
+Getopt::Long::Configure ("bundling");
 our @tiebreak;
 our $tiebreak_ready = 0;
 
