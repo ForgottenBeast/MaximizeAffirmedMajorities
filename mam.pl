@@ -99,7 +99,7 @@ sub readfile{
 		chomp $_;
 		$curvote[$i] = $_;
 		if($curvote[$i] =~ /\A\d,/){
-			my @votes = split /,\s?/, $curvote[$i];
+			my @votes = split /\s?,\s?/, $curvote[$i];
 			foreach my $v(@votes){
 				$seen{$v} = 1;
 			}
@@ -130,9 +130,9 @@ sub readfile{
 
 	for my $i (0 .. $#curvote){
 		my @candidates;
-		if($curvote[$i] =~ /^\d,\s?\d/){#more than one candidate on this line
+		if($curvote[$i] =~ /^\d\s?,\s?\d/){#more than one candidate on this line
 			#I split the candidate list into an array
-			@candidates = split /,\s?/,$curvote[$i];
+			@candidates = split /\s?,\s?/,$curvote[$i];
 
 			#foreach candidate in the list I count one vote for him
 			#against everyone below him
@@ -167,8 +167,8 @@ sub update_tiebreak{
 			}
 			else{
 				foreach my $t (@tiebreak){
-					if($t =~ /\d,\d/){
-						my @candidates = split /,\s?/, $t;
+					if($t =~ /\d\s?,\s?\d/){
+						my @candidates = split /\s?,\s?/, $t;
 
 						my $chosen_idx = firstidx {$_ == $v} @candidates;
 
