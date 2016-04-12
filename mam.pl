@@ -262,9 +262,15 @@ sub calculate_majorities{
 				if($fori > $forj){
 					$majorities[$n] = {$c1=>{$c2 => $fori,'min'=>$forj}};
 				}
-				else{
+				elsif($fori < $forj){
 					$majorities[$n] = {$c2=>{$c1 => $forj,'min'=>$fori}};
 				}
+                                else{#record both and let the tiebreak do his
+                                #job
+					$majorities[$n] = {$c2=>{$c1 => $forj,'min'=>$fori}};
+                                        $n++;
+					$majorities[$n] = {$c1=>{$c2 => $fori,'min'=>$forj}};
+                                }
 				$n++;
 			}
 		}
