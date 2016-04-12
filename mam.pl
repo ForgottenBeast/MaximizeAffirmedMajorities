@@ -408,7 +408,24 @@ sub scoresort{
 	my $a_score = (keys %$a)[0];
 	my $b_score = (keys %$b)[0];
 	
-	return $b->{$b_score} <=> $a->{$a_score};
+	if( $b->{$b_score}->{score} < $a->{$a_score}->{score}){
+            return -1;
+        }
+        elsif($b->{$b_score}->{score} == $a->{$a_score}->{score}){
+            our @tiebreak;
+            my $idx_a = firstidx {$_ == $a->{$a_score}->{self}} @tiebreak;
+            my $idx_b = firstidx {$_ == $b->{$b_score}->{self}} @tiebreak;
+
+            if($idx_a < $idx_b){
+                return -1;
+            }
+            else{
+                return 1;
+            }
+        }
+        else{
+            return 1;
+        }
 }
 
 sub relook{
@@ -420,7 +437,7 @@ sub relook{
 		foreach my $adv (keys %{$finishOrder->{$c}}){
 			$score += $finishOrder->{$c}->{$adv};
 		}
-		push @tmp_results, {$c => $score};
+		push @tmp_results, {$c => {score=>$score,self=>$c}};
 	}
 
 	@tmp_results = sort scoresort @tmp_results;
@@ -432,64 +449,165 @@ sub relook{
 	return \@results;
 }
 
+sub getdistance{
+    my $votes = shift;
+    my @candidates = keys %$votes;
+    my @distances;
+
+    foreach my $c (@candidates){
+        foreach my $a(@candidates){
+            if($a != $c){
+                $distances[$c][$a] = $votes->{$c}->{$a};
+                $distances[$a][$c] = $votes->{$a}->{$c};
+            }
+        }
+    }
+    return \@distances;
+}
+
+sub max{
+    my($x,$y) = @_;
+    if($x > $y){
+        return $x;
+    }
+    else{
+        return $y;
+    }
+}
+
+sub min{
+    my($x,$y) = @_;
+    if($x < $y){
+        return $x;
+    }
+    else{
+        return $y;
+    }
+}
+
+sub compute_path{
+    my $distances = shift;
+    print STDERR "I have $#$distances candidates\n";
+
+    my @path;
+    for my $i (1 .. $#$distances){
+        for my $j (1 .. $#$distances){
+            if($i != $j){
+                print STDERR "distance for $i and $j = $distances->[$i][$j]\n
+                reverse $j $i = $distances->[$j][$i]\n";
+               if($distances->[$i][$j] > $distances->[$j][$i]){
+                    $path[$i][$j]= $distances->[$i][$j];
+               }
+               else{
+                    $path[$i][$j]=0;
+               }
+            }
+        }
+    }
+
+    print STDERR "paths state before compute:\n".Dumper(\@path);
+
+    for my $i (1..$#$distances){
+        for my $j (1..$#$distances){
+            for my $k (1..$#$distances){
+                if($i != $j){
+                    if($i != $k && $j != $k){
+                        $path[$j][$k] =
+                        max($path[$j][$k],min($path[$j][$i],$path[$i][$k]));
+                    }
+                }
+            }
+        }
+    }
+    return \@path;
+}
+
+sub shulze_winner{
+    my $path = shift;
+    my %results;
+
+    for my $i(1 .. $#$path){
+        for my $j (1 .. $#$path){
+            if($i != $j){
+                $results{$i} = {$j => $path->[$i][$j]};
+            }
+        }
+    }
+    print STDERR "schulze winner hash = \n".Dumper(\%results);
+    return \%results;
+}
+
 sub main{
-	my $nbc = shift;
-	my @candidates;
-	my $j = 0;
-	for my $i (1..$nbc){
-		$candidates[$j] = $i;
-		$j++;
-                print "adding candidate $i\n";
-	}
+    my ($nbc,$schulze) = @_;
+    my @candidates;
+    my $j = 0;
+    my $finish_table;
+    for my $i (1..$nbc){
+            $candidates[$j] = $i;
+            $j++;
+            print "adding candidate $i\n";
+    }
 
 
-	my $hash = enumerate(\@candidates);
-	my @files = shuffle(glob("*.bt"));
-	foreach my $f (@files){
-		open(my $fh,'<',$f);
-		readfile($hash,$fh);
-		close($fh);
-	}
+    my $hash = enumerate(\@candidates);
+    my @files = shuffle(glob("*.bt"));
+    foreach my $f (@files){
+            open(my $fh,'<',$f);
+            readfile($hash,$fh);
+            close($fh);
+    }
 
-	our $tiebreak_ready;
-	if(!$tiebreak_ready){
-		print STDERR "autocompleting tiebreaker with strict random ballot\n";
-		rand_tiebreak_set(\@candidates,$hash);
-	}
-	my @maj = @{calculate_majorities($hash)};
-	@maj = sort majsort @maj;
-	print STDERR "majorities list:\n".Dumper(\@maj);
+    our $tiebreak_ready;
+    if(!$tiebreak_ready){
+            print STDERR "autocompleting tiebreaker with strict random ballot\n";
+            rand_tiebreak_set(\@candidates,$hash);
+    }
+    if(!defined($schulze)){
+        my @maj = @{calculate_majorities($hash)};
+        @maj = sort majsort @maj;
+        print STDERR "majorities list:\n".Dumper(\@maj);
 
-	my $finish_order = win_order(\@maj,\@candidates);
-	my $finish_table = relook($finish_order);
-	print STDERR "Finish order:\n".Dumper($finish_order);
-	our @tiebreak;
-	print STDERR "Tiebreak:\n";
-	foreach my $t (@tiebreak){
-		print STDERR "$t\n";
-	}
-	print "Here is the win order:\n";
-	for my $i (0 .. $#$finish_table){
-		print "$finish_table->[$i]\n";
-	}
+        my $finish_order = win_order(\@maj,\@candidates);
+        $finish_table = relook($finish_order);
+        print STDERR "Finish order:\n".Dumper($finish_order);
+    }
+    else{
+        my $distances = getdistance($hash);
+        print STDERR "distances:\n\n".Dumper($distances);
+        my $strongest_path = compute_path($distances);
+        print STDERR "paths:\n".Dumper($strongest_path);
+        $finish_table = relook(shulze_winner($strongest_path));
+    }
+    our @tiebreak;
+    print STDERR "Tiebreak:\n";
+    foreach my $t (@tiebreak){
+            print STDERR "$t\n";
+    }
+    print "Here is the win order:\n";
+    for my $i (0 .. $#$finish_table){
+            print "$finish_table->[$i]\n";
+    }
 }
 
 
 our @tiebreak;
 our $tiebreak_ready = 0;
 
-my($autogen,$delete,$candidates,$help);
+my($autogen,$delete,$schulze,$candidates,$help);
 GetOptions("autogen|a=i" => \$autogen,
 		   "delete|d" => \$delete,
 		   "candidates|c=i" =>\$candidates,
-		   "help|h" =>\$help) or exit;
+		   "help|h" =>\$help,
+                   "schulze|s"=>\$schulze) or exit;
 
 if(defined($help)||!defined($candidates)){
 	print "to run a voting simulation with randomly generated ballots:\n";
 	print "./mam.pl --(autogen|a) number_of_generated_ballots --(candidates|c)
 	number_of_candidates\n\n";
 	print "--delete option will remove all .bt files in the same directory after
-	computation\n\n";
+	computation\n";
+        print "--schulze|s will use the schulze method to compute the winning
+        order\n\n\n";
 	print "candidate option is obligatory\n";
 	exit;
 }
@@ -497,7 +615,7 @@ if(defined($help)||!defined($candidates)){
 if(defined($autogen)){
 	make_ballots($autogen,$candidates);
 }
-main($candidates);
+main($candidates,$schulze);
 if(defined($delete)){
 	del_ballots;
 }
