@@ -443,7 +443,7 @@ sub main{
 	}
 
 	our $tiebreak_ready;
-	while(!$tiebreak_ready){
+	if(!$tiebreak_ready){
 		print STDERR "autocompleting tiebreaker with strict random ballot\n";
 		rand_tiebreak_set(\@candidates,$hash);
 	}
