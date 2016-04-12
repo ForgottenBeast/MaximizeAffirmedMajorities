@@ -362,11 +362,14 @@ sub majsort{
 	
 		#here check for the minority size rule in case of equality
 		#the majority opposed by the smallest minority has precedence
+                print STDERR "solving $a_key -> $a_subkey vs $b_key -> $b_subkey using minority rules\n";
 		if($amin > $bmin)
 		{
-			print STDERR "solving $a_key -> $a_subkey vs $b_key -> $b_subkey using minority rules\n";
 			return 1;
 		}
+                elsif($amin < $bmin){
+                    return -1;
+                }
 		else{
 			#use tiebreak
 			our @tiebreak;
