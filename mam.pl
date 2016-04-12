@@ -22,19 +22,23 @@ sub make_ballots{
 		$candidates[$j] = $i;
 		$j++;
 	}
-
+        my $more_to_come = 0;
 	for my $i (0 .. $nb){
 		my @ballot = shuffle(@candidates);
 		open(my $fh, '>',$i.".bt");
-		foreach my $c(@ballot){
+		foreach my $i ( 0..$#ballot){
+                        my $c = $ballot[$i];
 			my $line_end = "\n";
-			if(int(rand(6)) == 0){#leave all other candidates out
+			if(int(rand(6)) == 0 && !$more_to_come){#leave all other candidates out
 				last;
 			}
-			elsif(int(rand(2)) == 0){#put one or more candidate on this row
+			elsif(int(rand(2)) == 0 && $i < $#ballot){#put one or more candidate on this row
 				$line_end = ",";
+                                $more_to_come = 1;
+				print $fh $c.$line_end;
 			}
 			else{
+                                $more_to_come = 0;
 				print $fh $c.$line_end;
 			}
 		}
@@ -70,7 +74,7 @@ sub vote_against_below{
 
 	#if on the lines below I encounter multiple candidates
 	#I count a vote against all of them
-		if($curvote[$j] =~ /^\d,\d/){
+		if($curvote[$j] =~ /^\d+,\d+/){
 			my @losers = split /,/,$curvote[$j];
 			foreach my $l (@losers){
 				$votes->{$c}->{$l}++;
@@ -98,7 +102,7 @@ sub readfile{
 	while(<$fh>){
 		chomp $_;
 		$curvote[$i] = $_;
-		if($curvote[$i] =~ /\A\d,/){
+		if($curvote[$i] =~ /\A\d+,/){
 			my @votes = split /\s?,\s?/, $curvote[$i];
 			foreach my $v(@votes){
 				$seen{$v} = 1;
@@ -115,7 +119,7 @@ sub readfile{
 	my $leftovers = "";
 	foreach my $k (@keys){
 		if(!$seen{$k}){
-			if($leftovers =~ /\d\z/){
+			if($leftovers =~ /\d+\z/){
 				$leftovers = $leftovers . ",$k";
 			}
 			else{#leftovers is empty
@@ -130,7 +134,7 @@ sub readfile{
 
 	for my $i (0 .. $#curvote){
 		my @candidates;
-		if($curvote[$i] =~ /^\d\s?,\s?\d/){#more than one candidate on this line
+		if($curvote[$i] =~ /^\d+\s?,\s?\d+/){#more than one candidate on this line
 			#I split the candidate list into an array
 			@candidates = split /\s?,\s?/,$curvote[$i];
 
@@ -161,13 +165,13 @@ sub update_tiebreak{
 	}
 	elsif(!$tiebreak_ready){
 		foreach my $v (@curvote){
-			if($v =~ /\d,\d/){
+			if($v =~ /\d+,\d+/){
 				next;
 				#curvote alreay has a tie
 			}
 			else{
 				foreach my $t (@tiebreak){
-					if($t =~ /\d\s?,\s?\d/){
+					if($t =~ /\d+\s?,\s?\d+/){
 						my @candidates = split /\s?,\s?/, $t;
 
 						my $chosen_idx = firstidx {$_ == $v} @candidates;
@@ -435,7 +439,9 @@ sub main{
 	for my $i (1..$nbc){
 		$candidates[$j] = $i;
 		$j++;
+                print "adding candidate $i\n";
 	}
+
 
 	my $hash = enumerate(\@candidates);
 	my @files = shuffle(glob("*.bt"));
