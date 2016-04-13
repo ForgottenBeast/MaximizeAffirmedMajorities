@@ -529,7 +529,7 @@ sub shulze_winner{
     for my $i(1 .. $#$path){
         for my $j (1 .. $#$path){
             if($i != $j){
-                $results{$i} = {$j => $path->[$i][$j]};
+                $results{$i}->{$j} = $path->[$i][$j];
             }
         }
     }
